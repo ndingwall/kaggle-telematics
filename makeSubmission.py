@@ -1,7 +1,5 @@
 __author__ = 'Nick'
 
-__author__ = 'Nick'
-
 import csv, os, json
 import sys
 from random import sample
