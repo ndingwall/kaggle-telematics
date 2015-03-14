@@ -8,6 +8,7 @@ import numpy as np
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import roc_auc_score
+from sklearn.cross_validation import StratifiedKFold
 from datetime import datetime
 #from multiprocessing import Pool
 sys.stdout.flush()
@@ -32,7 +33,7 @@ def classify(trainData, trainLabels, testData, n_trees, depth, LRate):
     global importance
     y = np.ones((testData.shape[0],))
     #clf = GradientBoostingRegressor(n_estimators = n_trees, max_depth = depth, learning_rate = LRate)
-    clf = RandomForestRegressor(n_estimators=n_trees, max_depth = depth)
+    clf = RandomForestRegressor(n_estimators=n_trees, max_depth = depth, n_jobs=-1)
     clf.fit(trainData, trainLabels)
     y = clf.predict(testData)
     #y = 0.5 * np.ones(testData.shape[0])
@@ -50,28 +51,21 @@ def gen_validation(driver, n_trees, depth, LRate):
     thisauc = [] #initialise empty list to store auc scores for this driver
     posData = np.asarray(features[driver]) # get features for this driver
     posData = posData[:,1:] # drop the column with trip number
+    posData = posData[posData[:,20] < 100, :] # check for speeds over 100m/s
     negData = make_negative(driver, 101, 2) # make a negative set of 100 drivers (it removes one every time in case the current driver is in the list of 101)
-    tripsShuffled = range(200)
-    shuffle(tripsShuffled) # shuffle trip numbers.
-    for fold in range(5):
-        # Admin
-        testIdx = tripsShuffled[fold * 40:fold * 40 + 40] # Choose indexes for test set
-        trainIdx = diff(tripsShuffled, testIdx) # find remaining indexes for training set
-        trainData = np.append(posData[trainIdx,:], negData[trainIdx,:], axis = 0) # build train set
-        testData = np.append(posData[testIdx,:], negData[testIdx, :], axis = 0) # build test set
-        #testData = np.append(posData[testIdx,:], negData[testIdx[1:3], :], axis = 0) # build test set
-        trainLabels = np.append(np.ones(len(trainIdx)), np.zeros(len(trainIdx))) # write train labels
-        testLabels = np.append(np.ones(len(testIdx)), np.zeros(len(testIdx))) # write test labels
-        #testLabels = np.append(np.ones(len(testIdx)), np.zeros(2)) # write test labels
-        # THE MAGIC HAPPENS HERE!
-        y = classify(trainData, trainLabels, testData, n_trees, depth, LRate) # train the classifier and return predictions
-        #
-        thisauc = np.append(thisauc, roc_auc_score(testLabels, y)) # calculate AUC and add to a list
+    negData = negData[negData[:,20] < 100, :] # check for speeds over 100 m/s
+    posLabels = np.ones((posData.shape[0],))
+    negLabels = np.zeros((negData.shape[0],))
+    trainData = np.append(posData, negData, axis = 0)
+    trainLabels = np.append(posLabels, negLabels, axis = 0)
+    skf = StratifiedKFold(trainLabels, n_folds = 5, shuffle=True)
+    for train_idx, test_idx in skf:
+        y = classify(trainData[train_idx,:], trainLabels[train_idx], trainData[test_idx, :], n_trees, depth, LRate)
+        thisauc = np.append(thisauc, roc_auc_score(trainLabels[test_idx], y))
     return thisauc
 
 def load_features():
     global num_features, features, drivers
-    # load csv
     f = open('all_features.csv')
     csv_f = csv.reader(f)
     csv_f.next()
@@ -82,13 +76,17 @@ def load_features():
         driver = row[1]
         drivers.add(driver)
         if driver not in features:
-            #features[driver] = [row[2:]]
-            temp = [row[x] for x in feature_selection]
+            try:
+                temp = [float(row[x]) for x in feature_selection]
+            except:
+                print driver, [row[x] for x in feature_selection]
             features[driver] = [temp]
         else:
-            temp = [row[x] for x in feature_selection]
+            try:
+                temp = [float(row[x]) for x in feature_selection]
+            except:
+                print driver, [row[x] for x in feature_selection]
             features[driver].append(temp)
-            #features[driver].append(row[2:])
     num_features = len(features['1'][1])
 
     # remove NaN
@@ -146,11 +144,9 @@ if __name__ == '__main__':
     # try_lr = [0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25]
     # auc_results = grid_search(driv, try_n_trees, try_depth, try_lr, 50)
     auc = np.zeros([1,5]) # initialise table for results
+    shuffle(driv)
     for driver in driv:
-       auc = np.vstack((auc,gen_validation(driver, 200, 3, 0.1)))
+       auc = np.vstack((auc,gen_validation(driver, 200, 5, 0.1)))
        print "Mean AUC so far: %1.4f. Just finished driver %d." % (np.mean(auc[1:,:]), int(driver))
     auc = auc[1:,:] # drop first row of auc (initialised to zero)
-    #np.save('auc_results_March_11', auc_results) # save AUC file in npy format
     print 'Done, elapsed time: %s' % str(datetime.now() - start)
-    #print np.mean(auc)
-    #print np.var(auc)
