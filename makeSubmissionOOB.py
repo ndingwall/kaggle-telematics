@@ -137,7 +137,6 @@ if __name__ == '__main__':
     output = ""
     driv = sorted(drivers)
     driv = sample(driv, 50)
-    driv = ['1138']
     #p = Pool(4)
     #p.map(gen_training_data_and_train, driv)
     results = np.zeros((1,4))
