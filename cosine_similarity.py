@@ -44,7 +44,7 @@ def normalise_features(feature_list):
 
 # for trip in features[driver]:
 start = datetime.now()
-# drivers = sample(drivers, 10)
+drivers = sample(drivers, 10)
 cosines = {}
 drivrs = sorted(drivers)
 for driver in drivrs:
@@ -59,7 +59,7 @@ for driver in drivrs:
         cosine_differences[j,:].sort()
         mean_diff = np.mean(cosine_differences[j,1:11])
         if driver not in cosines:
-            cosines[driver] = [j, mean_diff]
+            cosines[driver] = [[j, mean_diff]]
         else:
             cosines[driver].append([j, mean_diff])
     print 'Done driver %s, elapsed time: %s' % (driver, str(datetime.now() - start))
