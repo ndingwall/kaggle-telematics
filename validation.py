@@ -5,11 +5,11 @@ import csv, os, json
 import sys
 from random import sample, shuffle
 import numpy as np
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import roc_auc_score
 from sklearn.cross_validation import StratifiedKFold
 from datetime import datetime
+import pickle
 #from multiprocessing import Pool
 sys.stdout.flush()
 start = datetime.now()
@@ -24,7 +24,7 @@ def make_negative(driver, num_drivers = 100, num_traces = 2):
         negDrivers = sample(negDrivers, num_drivers - 1)
     # Now get features for these journeys
     for d in negDrivers:
-        negTraces = sample(xrange(100), num_traces)
+        negTraces = sample(xrange(200), num_traces)
         for t in negTraces:
             negData = np.vstack((negData, np.asarray(features[d][t][1:])))
     return negData
@@ -33,9 +33,10 @@ def classify(trainData, trainLabels, testData, n_trees, depth, LRate):
     global importance
     y = np.ones((testData.shape[0],))
     #clf = GradientBoostingRegressor(n_estimators = n_trees, max_depth = depth, learning_rate = LRate)
-    clf = RandomForestRegressor(n_estimators=n_trees, max_depth = depth, n_jobs=-1)
+    clf = RandomForestClassifier(n_estimators=n_trees, oob_score=True ,max_depth = depth, n_jobs=-1)
     clf.fit(trainData, trainLabels)
-    y = clf.predict(testData)
+    # y = clf.predict(testData)
+    y = clf.predict_proba(testData)[:,1]
     #y = 0.5 * np.ones(testData.shape[0])
     #y = clf.predict_proba(testData)
     #y = y[:,1]
@@ -61,6 +62,7 @@ def gen_validation(driver, n_trees, depth, LRate):
     skf = StratifiedKFold(trainLabels, n_folds = 5, shuffle=True)
     for train_idx, test_idx in skf:
         y = classify(trainData[train_idx,:], trainLabels[train_idx], trainData[test_idx, :], n_trees, depth, LRate)
+        # Combine classifier with cosine similarities
         thisauc = np.append(thisauc, roc_auc_score(trainLabels[test_idx], y))
     return thisauc
 
