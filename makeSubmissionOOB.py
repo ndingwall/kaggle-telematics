@@ -136,7 +136,6 @@ if __name__ == '__main__':
     # make predictions
     output = ""
     driv = sorted(drivers)
-    driv = sample(driv, 50)
     #p = Pool(4)
     #p.map(gen_training_data_and_train, driv)
     results = np.zeros((1,4))
