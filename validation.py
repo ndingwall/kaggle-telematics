@@ -107,12 +107,15 @@ def normalise_probs(table):
 
 def find_auc(driv, n_trees, depth, LRate):
     auc = np.zeros([1,5]) # initialise table for results
-    for driver in driv:
+    for i, driver in enumerate(driv):
         auc = np.vstack((auc,gen_validation(driver, n_trees, depth, LRate)))
-        #print "Mean AUC so far: %1.4f. Just finished driver %d." % (np.mean(auc[1:,:]), int(driver))
+        sys.stdout.write("\rMean and Var AUC so far: %1.5f, %1.5f. Just finished driver %d. (%d/%d)" \
+                         % (np.mean(auc[1:,:]), np.var(auc[1:,:]), int(driver), i+1, len(driv)))
+        sys.stdout.flush()
     auc = auc[1:,:]
     meanAUC = np.mean(auc)
-    return meanAUC
+    varAUC = np.var(auc)
+    return meanAUC, varAUC
 
 def grid_search(driv, list_trees, list_depth, list_lr, num_drivers):
     driv = sample(driv, num_drivers)
@@ -124,10 +127,11 @@ def grid_search(driv, list_trees, list_depth, list_lr, num_drivers):
         for depth in list_depth:
             estPos = 0
             for n_trees in list_trees:
-                thisAUC = find_auc(driv, n_trees, depth, lr)
-                auc_results[lrPos, depthPos, estPos] = thisAUC
+                thisMeanAUC, thisVarAUC = find_auc(driv, n_trees, depth, lr)
+                auc_results[lrPos, depthPos, estPos] = thisMeanAUC
                 estPos += 1
-                print "Mean AUC = %1.4f for %d estimators of max depth %d with learning rate %1.3f" % (thisAUC, n_trees, depth, lr)
+                print "\nRESULT: Mean AUC = %1.5f, Var AUC = %1.5f for %d estimators of max depth %d with learning rate %1.3f\n" % \
+                    (thisMeanAUC, thisVarAUC, n_trees, depth, lr)
             depthPos += 1
         lrPos += 1
     return auc_results
@@ -141,14 +145,14 @@ if __name__ == '__main__':
     importance = np.asarray(range(num_features - 1), dtype = np.int) + 1
     driv = sorted(drivers)
     # Choose values for grid search
-    # try_n_trees = [50, 75, 100, 125, 150]
-    # try_depth = [2,3,4]
-    # try_lr = [0.05, 0.075, 0.1, 0.125, 0.15, 0.175, 0.2, 0.225, 0.25]
-    # auc_results = grid_search(driv, try_n_trees, try_depth, try_lr, 50)
+    try_n_trees = [500]
+    try_depth = [4,5,6,7,8,9,10]
+    try_lr = [0.05]
+    auc_results = grid_search(driv, try_n_trees, try_depth, try_lr, 5)
     auc = np.zeros([1,5]) # initialise table for results
     shuffle(driv)
-    for driver in driv:
-       auc = np.vstack((auc,gen_validation(driver, 200, 5, 0.1)))
-       print "Mean AUC so far: %1.4f. Just finished driver %d." % (np.mean(auc[1:,:]), int(driver))
+    # for driver in driv:
+    #    auc = np.vstack((auc,gen_validation(driver, 200, 5, 0.1)))
+    #    print "Mean AUC so far: %1.4f. Just finished driver %d." % (np.mean(auc[1:,:]), int(driver))
     auc = auc[1:,:] # drop first row of auc (initialised to zero)
     print 'Done, elapsed time: %s' % str(datetime.now() - start)
