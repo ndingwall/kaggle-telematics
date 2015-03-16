@@ -28,7 +28,7 @@ def make_negative(driver, num_drivers = 100, num_traces = 2):
 def classify(trainData, trainLabels, testData):
     global importance
     y = np.zeros((testData.shape[0],1))
-    clf = RandomForestClassifier(n_estimators=500, oob_score=True ,max_depth = 10, n_jobs=-1)
+    clf = RandomForestClassifier(n_estimators=2000, oob_score=True ,max_depth = 15, n_jobs=-1)
     clf.fit(trainData, trainLabels)
     # y1 = clf.predict_proba(testData)[:,1]
     yRF = clf.oob_decision_function_
@@ -61,7 +61,7 @@ def gen_training_data_and_train(driver):
     posData = posData[:,1:]
     ignoredTrips = posData[:,20] > 100
     posData = posData[-ignoredTrips, :] # check for speeds over 100m/s
-    negData = make_negative(driver, 101, 2)
+    negData = make_negative(driver, 251, 2)
     negData = negData[negData[:,20] < 100, :] # check for speeds over 100m/s
     posLabels = np.ones((posData.shape[0],))
     negLabels = np.zeros((negData.shape[0],))
@@ -70,15 +70,18 @@ def gen_training_data_and_train(driver):
     trainData = np.append(posData, negData, axis = 0)
     trainLabels = np.append(posLabels, negLabels, axis = 0)
     yRF[-ignoredTrips, 0] = classify(trainData, trainLabels, testData)
-    ySVM = classifySVM(trainData, trainLabels, testData)
-    yLR = classifyLogisticReg(trainData, trainLabels, testData)
-    y = (5 * yRF + ySVM + yLR) / 7
-    driverCol = int(driver) * np.ones((len(y)))
+    # ySVM = classifySVM(trainData, trainLabels, testData)
+    # yLR = classifyLogisticReg(trainData, trainLabels, testData)
+    # y1 = (5 * yRF + ySVM + yLR) / 7
+    # y2 = (2 * yRF + ySVM + yLR) / 4
+    y1 = yRF
+    driverCol = int(driver) * np.ones((len(y1)))
     tripCol = np.asarray([int(item[0]) for item in features[driver]])
-    resultsTemp = np.zeros((3,len(y)))
+    resultsTemp = np.zeros((4,len(y1)))
     resultsTemp[0,:] = driverCol
     resultsTemp[1,:] = tripCol
-    resultsTemp[2,:] = y[:,0]
+    resultsTemp[2,:] = y1[:,0]
+    resultsTemp[3,:] = y1[:,0]
     # resultsTemp[3,:] = y[:,1]
     resultsTable = resultsTemp.T
     #output += write_kaggle(driver, features[driver], y)
@@ -169,15 +172,15 @@ if __name__ == '__main__':
     # output = ""
     driv = sorted(drivers)
     normalised_features = normalise_features(features, driv)
-    results = np.zeros((1,3))
+    results = np.zeros((1,4))
     for driver in driv:
         results = np.vstack((results,gen_training_data_and_train(driver)))
     # make submissions
     submission_id = datetime.now().strftime("%Y_%d_%B_%H_%M")
-    text_file = open("nick-code-{0}.csv".format(submission_id), "w")
+    text_file = open("nick-code-{0}-5RF.csv".format(submission_id), "w")
     text_file.write(make_sub(results[:,[0,1,2]]))
     text_file.close
-    # text_file_2 = open("nick-code-{0}-OOB.csv".format(submission_id), "w")
+    # text_file_2 = open("nick-code-{0}-2RF.csv".format(submission_id), "w")
     # text_file_2.write(make_sub(results[:,[0,1,3]]))
     # text_file_2.close
     # np.savetxt("importance-{0}.csv".format(submission_id), importance, delimiter=",")
